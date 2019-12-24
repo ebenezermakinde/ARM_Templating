@@ -1,22 +1,42 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {},
-    "variables": {},
-    "resources": [
-        {
-            "name": "codeoptimusstor2345",
-            "type": "Microsoft.Storage/storageAccounts",
-            "apiVersion": "2015-06-15",
-            "location": "[resourceGroup().location]",
-            "tags": {
-                "displayName": "codeoptimusstor2345"
-            },
-            "properties": {
-                "accountType": "Standard_LRS"
-            }
-        }
-    ],
-    "outputs": {},
-    "functions": []
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "storageAccount": {
+      "type": "string",
+      "metadata": {
+        "description": "Storage account deployment template - Storage account name must be unique"
+      }
+    },
+    "accountType": {
+      "type": "string",
+      "defaultValue": "Standard_LRS",
+      "allowedValues": [
+        "Standard_LRS",
+        "Standard_GRS",
+        "Standard_ZRS",
+        "Premium_LRS"
+      ],
+      "metadata": {
+        "description": "Sku Type"
+      }
+    }
+  },
+  "variables": {},
+  "resources": [
+    {
+      "name": "[parameters('storageAccount')]",
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2015-06-15",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "[parameters('storageAccount')]"
+      },
+      "properties": {
+        "accountType": "[parameters('accountType')]"
+      }
+    }
+  ],
+  "outputs": {},
+  "functions": []
 }
