@@ -1,0 +1,123 @@
+{
+  "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "webAppNamePrefix": {
+      "defaultValue":"codeoptimus",
+      "maxLength":11,
+      "type": "string",
+      "metadata":{
+        "description":"Prefix name of the webapp - maxlength is 11"
+      }
+    }
+  },
+  "variables":{
+    "webAppName":"[toLower(concat(parameters('webAppNamePrefix'),uniqueString(resourceGroup().id)))]",
+    "webAppPlan":"[concat(variables('webAppName'),'-ASP')]",
+    "webAppPlanId":"[resourceId('Microsoft.Web/serverfarms',variables('webAppPlan'))]",
+    "webAppInsights":"[concat('microsoft.insights/components/',variables('webAppName'))]",
+    "errorLink":"[concat('https://',variables('webAppName'),'.scm.azurewebsites.net/detectors')]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2018-11-01",
+      "name": "[variables('webAppName')]",
+      "type": "Microsoft.Web/sites",
+      "location": "[resourceGroup().location]",
+      "tags": {},
+      "dependsOn": [
+        "[variables('webAppInsights')]",
+        "[variables('webAppPlanId')]"
+      ],
+      "properties": {
+        "name": "[variables('webAppName')]",
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "APPINSIGHTS_INSTRUMENTATIONKEY",
+              "value": "[reference(variables('webAppInsights'), '2015-05-01').InstrumentationKey]"
+            },
+            {
+              "name": "ApplicationInsightsAgent_EXTENSION_VERSION",
+              "value": "~2"
+            },
+            {
+              "name": "XDT_MicrosoftApplicationInsights_Mode",
+              "value": "default"
+            },
+            {
+              "name": "DiagnosticServices_EXTENSION_VERSION",
+              "value": "disabled"
+            },
+            {
+              "name": "APPINSIGHTS_PROFILERFEATURE_VERSION",
+              "value": "disabled"
+            },
+            {
+              "name": "APPINSIGHTS_SNAPSHOTFEATURE_VERSION",
+              "value": "disabled"
+            },
+            {
+              "name": "InstrumentationEngine_EXTENSION_VERSION",
+              "value": "disabled"
+            },
+            {
+              "name": "SnapshotDebugger_EXTENSION_VERSION",
+              "value": "disabled"
+            },
+            {
+              "name": "XDT_MicrosoftApplicationInsights_BaseExtensions",
+              "value": "disabled"
+            },
+            {
+              "name": "ANCM_ADDITIONAL_ERROR_PAGE_LINK",
+              "value": "[variables('errorLink')]"
+            }
+          ],
+          "metadata": [
+            {
+              "name": "CURRENT_STACK",
+              "value": "dotnetcore"
+            }
+          ],
+          "alwaysOn": false
+        },
+        "serverFarmId": "[variables('webAppPlanId')]",
+        "clientAffinityEnabled": true
+      }
+    },
+    {
+      "apiVersion": "2018-02-01",
+      "name": "[variables('webAppPlan')]",
+      "type": "Microsoft.Web/serverfarms",
+      "location": "[resourceGroup().location]",
+      "kind": "",
+      "tags": {},
+      "dependsOn": [],
+      "properties": {
+        "name": "[variables('webAppPlan')]",
+        "workerSize": "1",
+        "workerSizeId": "0",
+        "numberOfWorkers": "1",
+        "hostingEnvironment": ""
+      },
+      "sku": {
+        "Tier": "Free",
+        "Name": "F1"
+      }
+    },
+    {
+      "apiVersion": "2015-05-01",
+      "name": "[variables('webAppName')]",
+      "type": "microsoft.insights/components",
+      "kind":"string",
+      "location": "[resourceGroup().location]",
+      "tags": {},
+      "properties": {
+        "ApplicationId": "[variables('webAppName')]",
+        "Application_Type": "web",
+        "Request_Source": "rest"
+      }
+    }
+  ]
+}
