@@ -1,0 +1,251 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+
+    "insertTPS": {
+      "type": "int",
+      "defaultValue": 20000
+    },
+    "upsertTPS": {
+      "type": "int",
+      "defaultValue": 0
+    },
+    "deleteTPS": {
+      "type": "int",
+      "defaultValue": 0
+    },
+    "readTPS": {
+      "type": "int",
+      "defaultValue": 0
+    },
+    "APIType": {
+      "type": "string",
+      "defaultValue": "SQLAPI",
+      "allowedValues": [
+        "SQLAPI",
+        "MongoAPI",
+        "CassandraAPI",
+        "GremlinAPI",
+        "TableAPI",
+        "ETCD"
+      ]
+    },
+    "TestName": {
+      "type": "string",
+      "defaultValue": "test007"
+    },
+    "deleteGeneratedData": {
+      "type": "bool",
+      "defaultValue": false
+    },
+    "PartitionKeys": {
+      "type": "string",
+      "metadata": {
+        "description": "Please specify comma separated partition key"
+      },
+      "defaultValue": "id"
+    }
+  },
+  "variables": {
+    "accountName": "[toLower(parameters('TestName'))]",
+    "collectionNames": "[split(parameters('PartitionKeys'),',')]",
+    "throughput": "[add(add(mul(parameters('insertTPS'),7),mul(parameters('upsertTPS'),7)),add(mul(parameters('readTPS'),1),mul(parameters('deleteTPS'),3)))]"
+  },
+  "resources": [
+    {
+      "apiVersion": "2020-03-01",
+      "condition": "[equals(parameters('APIType'), 'SQLAPI')]",
+      "kind": "GlobalDocumentDB",
+      "location": "[resourceGroup().location]",
+      "type": "Microsoft.DocumentDB/databaseAccounts",
+      "name": "[variables('accountName')]",
+      "properties": {
+        "consistencyPolicy": {
+          "defaultConsistencyLevel": "Eventual"
+
+        },
+        "databaseAccountOfferType": "Standard",
+        "locations": [
+          {
+            "locationName": "westus2",
+            "failoverPriority": 0,
+            "isZoneRedundant": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+      "name": "[concat(variables('accountName'), '/', 'testdb')]",
+      "apiVersion": "2020-03-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/', variables('accountName'))]"
+      ],
+      "properties": {
+        "resource": {
+          "id": "testdb"
+        },
+        "options": {
+          "throughput": "400"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.DocumentDb/databaseAccounts/sqlDatabases/containers",
+      "apiVersion": "2020-03-01",
+      "dependsOn": [
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases', variables('accountName'), 'testdb')]"
+      ],
+      "name": "[concat(variables('accountName'), '/', 'testdb', '/', split(parameters('PartitionKeys'),',')[copyIndex()])]",
+      "copy": {
+        "name": "collectioncopy",
+        "count": "[length(split(parameters('PartitionKeys'),','))]"
+      },
+      "properties": {
+        "resource": {
+          "id": "[split(parameters('PartitionKeys'),',')[copyIndex()]]",
+          "partitionKey": {
+            "paths": [
+              "[concat('/', split(parameters('PartitionKeys'),',')[copyIndex()])]"
+            ],
+            "kind": "Hash"
+
+          },
+          "indexingPolicy": {
+            "automatic": true,
+            "excludedPaths": [
+              {
+                "path": "/*"
+              }
+            ],
+            "includedPaths": [
+              {
+                "path": "[if(equals(concat('/', split(parameters('PartitionKeys'),',')[copyIndex()]),'/id'),'/fake/?',concat('/',split(parameters('PartitionKeys'),',')[copyIndex()]))]"
+              }
+            ],
+            "indexingMode": "Consistent"
+          },
+
+          "defaultTtl": "[if(parameters('deleteGeneratedData'),3600,-1)]"
+        },
+        "options": {
+          "throughput": "[if(greater(variables('throughput'),399),variables('throughput'),400)]"
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[concat('fns',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins')]",
+      "copy": {
+        "name": "fncstoragecopy",
+        "count": "[length(variables('collectionNames'))]"
+      },
+      "apiVersion": "2019-04-01",
+      "location": "[resourceGroup().location]",
+      "kind": "StorageV2",
+      "sku": {
+        "name": "Standard_LRS"
+      }
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2015-08-01",
+      "copy": {
+        "name": "fncplancopy",
+        "count": "[length(variables('collectionNames'))]"
+      },
+
+      "name": "[concat('applan',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "name": "[concat('applan',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins')]",
+        "computeMode": "Dynamic"
+      },
+      "sku": {
+        "name": "Y1",
+        "tier": "Dynamic",
+        "size": "Y1",
+        "family": "Y",
+        "capacity": 0
+      }
+
+    },
+    {
+      "apiVersion": "2018-11-01",
+      "type": "Microsoft.Web/sites",
+      "copy": {
+        "name": "fncopy",
+        "count": "[length(variables('collectionNames'))]"
+      },
+      "name": "[concat('fn',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins')]",
+      "location": "[resourceGroup().location]",
+      "kind": "functionapp",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', concat('applan',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'))]",
+        "[resourceId('Microsoft.Storage/storageAccounts',concat('fns',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'))]",
+        "[resourceId('Microsoft.DocumentDB/databaseAccounts',variables('accountName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', concat('applan',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'))]",
+        "siteConfig": {
+          "appSettings": [
+            {
+              "name": "connectionString",
+              "value": "[listConnectionStrings(resourceId('Microsoft.DocumentDB/databaseAccounts',variables('accountName')),'2019-12-12').connectionStrings[0].connectionString]"
+            },
+            {
+              "name": "database",
+              "value": "testdb"
+            },
+            {
+              "name": "container",
+              "value": "[variables('collectionNames')[0]]"
+            },
+            {
+              "name": "InsertTPS",
+              "value": "[parameters('insertTPS')]"
+            },
+            {
+              "name": "AzureWebJobsStorage",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', concat('fns',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'), ';AccountKey=', listKeys(concat('fns',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'),'2015-05-01-preview').key1)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING",
+              "value": "[concat('DefaultEndpointsProtocol=https;AccountName=', concat('fns',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'), ';AccountKey=', listKeys(concat('fns',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'),'2015-05-01-preview').key1)]"
+            },
+            {
+              "name": "WEBSITE_CONTENTSHARE",
+              "value": "[toLower(concat('fn',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'))]"
+            },
+            {
+              "name": "FUNCTIONS_WORKER_RUNTIME",
+              "value": "dotnet"
+            },
+            {
+              "name": "FUNCTIONS_EXTENSION_VERSION",
+              "value": "~2"
+            }
+          ]
+        }
+      },
+      "resources": [
+        {
+          "apiVersion": "2018-11-01",
+          "name": "web",
+          "type": "sourcecontrols",
+          "dependsOn": [
+            "[resourceId('Microsoft.Web/sites/', concat('fn',parameters('TestName'),variables('collectionNames')[copyIndex()],'ins'))]"
+          ],
+          "properties": {
+            "RepoUrl": "https://github.com/ebenezermakinde/publishertest.git",
+            "branch": "master",
+            "IsManualIntegration": true
+          }
+        }
+      ]
+
+    }
+
+  ]
+}

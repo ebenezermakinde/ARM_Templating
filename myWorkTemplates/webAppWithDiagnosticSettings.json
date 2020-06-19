@@ -1,149 +1,149 @@
 {
-    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
-    "contentVersion": "1.0.0.0",
-    "parameters": {
-        "settingName": {
-            "type": "string",
-            "defaultValue": "logging",
-            "metadata": {
-                "description": "Setting name"
-            }
-        },
-        "webAppNamePrefix": {
-            "defaultValue": "codeoptimus",
-            "maxLength": 11,
-            "type": "string",
-            "metadata": {
-                "description": "Prefix name of the webapp - maxlength is 11"
-            }
-        },
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "settingName": {
+      "type": "string",
+      "defaultValue": "logging",
+      "metadata": {
+        "description": "Setting name"
+      }
+    },
+    "webAppNamePrefix": {
+      "defaultValue": "codeoptimus",
+      "maxLength": 11,
+      "type": "string",
+      "metadata": {
+        "description": "Prefix name of the webapp - maxlength is 11"
+      }
+    },
+    "sku": {
+      "type": "string",
+      "defaultValue": "S1",
+      "metadata": {
+        "description": "The SKU of App Service Plan "
+      }
+    },
+    "linuxFxVersion": {
+      "type": "string",
+      "defaultValue": "php|7.0",
+      "metadata": {
+        "description": "The Runtime stack of current web app"
+      }
+    }
+  },
+  "variables": {
+    "webAppPortalName": "[toLower(concat(parameters('webAppNamePrefix'),uniqueString(resourceGroup().id)))]",
+    "appServicePlanName": "[concat(parameters('webAppNamePrefix'),'-ASP')]",
+    "workSpaceName": "[concat(parameters('webAppNamePrefix'),'-workspace')]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2018-02-01",
+      "name": "[variables('appServicePlanName')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "[parameters('sku')]"
+      },
+      "kind": "linux",
+      "properties": {
+        "reserved": true
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2018-11-01",
+      "name": "[variables('webAppPortalName')]",
+      "location": "[resourceGroup().location]",
+      "kind": "app",
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+      ],
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+        "siteConfig": {
+          "linuxFxVersion": "[parameters('linuxFxVersion')]"
+        }
+      }
+    },
+    {
+      "name": "[variables('workSpaceName')]",
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2015-11-01-preview",
+      "location": "[resourceGroup().location]",
+      "tags": {},
+      "properties": {
         "sku": {
-            "type": "string",
-            "defaultValue": "S1",
-            "metadata": {
-                "description": "The SKU of App Service Plan "
-            }
-        },
-        "linuxFxVersion": {
-            "type": "string",
-            "defaultValue": "php|7.0",
-            "metadata": {
-                "description": "The Runtime stack of current web app"
-            }
+          "name": "Standard"
         }
+      }
     },
-    "variables": {
-        "webAppPortalName": "[toLower(concat(parameters('webAppNamePrefix'),uniqueString(resourceGroup().id)))]",
-        "appServicePlanName": "[concat(parameters('webAppNamePrefix'),'-ASP')]",
-        "workSpaceName": "[concat(parameters('webAppNamePrefix'),'-workspace')]"
-    },
-    "resources": [
-        {
-            "type": "Microsoft.Web/serverfarms",
-            "apiVersion": "2018-02-01",
-            "name": "[variables('appServicePlanName')]",
-            "location": "[resourceGroup().location]",
-            "sku": {
-                "name": "[parameters('sku')]"
-            },
-            "kind": "linux",
-            "properties": {
-                "reserved": true
+    {
+      "type": "microsoft.web/sites/providers/diagnosticSettings",
+      "name": "[concat(variables('webAppPortalName'),'/microsoft.insights/',parameters('settingName'))]",
+      "apiVersion": "2017-05-01-preview",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workSpaceName'))]",
+        "[resourceId('Microsoft.Web/sites',variables('webAppPortalName'))]"
+      ],
+      "properties": {
+        "name": "To my Logger",
+        "workspaceId": "[concat('subscriptions/<Insert subId linked to workspace>/resourceGroups/',resourceGroup().name,'/providers/microsoft.operationalinsights/workspaces/',variables('workSpaceName'))]",
+        "logs": [
+          {
+            "category": "AppServiceHTTPLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
             }
-        },
-        {
-            "type": "Microsoft.Web/sites",
-            "apiVersion": "2018-11-01",
-            "name": "[variables('webAppPortalName')]",
-            "location": "[resourceGroup().location]",
-            "kind": "app",
-            "dependsOn": [
-                "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
-            ],
-            "properties": {
-                "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
-                "siteConfig": {
-                    "linuxFxVersion": "[parameters('linuxFxVersion')]"
-                }
+          },
+          {
+            "category": "AppServiceConsoleLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
             }
-        },
-        {
-            "name": "[variables('workSpaceName')]",
-            "type": "Microsoft.OperationalInsights/workspaces",
-            "apiVersion": "2015-11-01-preview",
-            "location": "[resourceGroup().location]",
-            "tags": {},
-            "properties": {
-                "sku": {
-                    "name": "Standard"
-                }
+          },
+          {
+            "category": "AppServiceAppLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
             }
-        },
-        {
-            "type": "microsoft.web/sites/providers/diagnosticSettings",
-            "name": "[concat(variables('webAppPortalName'),'/microsoft.insights/',parameters('settingName'))]",
-            "apiVersion": "2017-05-01-preview",
-            "dependsOn": [
-                "[resourceId('Microsoft.OperationalInsights/workspaces', variables('workSpaceName'))]",
-                "[resourceId('Microsoft.Web/sites',variables('webAppPortalName'))]"
-            ],
-            "properties": {
-                "name": "To my Logger",
-                "workspaceId": "[concat('subscriptions/<Insert subId linked to workspace>/resourceGroups/',resourceGroup().name,'/providers/microsoft.operationalinsights/workspaces/',variables('workSpaceName'))]",
-                "logs": [
-                    {
-                        "category": "AppServiceHTTPLogs",
-                        "enabled": true,
-                        "retentionPolicy": {
-                            "enabled": false,
-                            "days": 0
-                        }
-                    },
-                    {
-                        "category": "AppServiceConsoleLogs",
-                        "enabled": true,
-                        "retentionPolicy": {
-                            "enabled": false,
-                            "days": 0
-                        }
-                    },
-                    {
-                        "category": "AppServiceAppLogs",
-                        "enabled": true,
-                        "retentionPolicy": {
-                            "enabled": false,
-                            "days": 0
-                        }
-                    },
-                    {
-                        "category": "AppServiceFileAuditLogs",
-                        "enabled": true,
-                        "retentionPolicy": {
-                            "enabled": false,
-                            "days": 0
-                        }
-                    },
-                    {
-                        "category": "AppServiceAuditLogs",
-                        "enabled": true,
-                        "retentionPolicy": {
-                            "enabled": false,
-                            "days": 0
-                        }
-                    }
-                ],
-                "metrics": [
-                    {
-                        "timeGrain": "PT1M",
-                        "category": "AllMetrics",
-                        "enabled": true,
-                        "retentionPolicy": {
-                            "enabled": false,
-                            "days": 0
-                        }
-                    }
-                ]
+          },
+          {
+            "category": "AppServiceFileAuditLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
             }
-        }
-    ]
+          },
+          {
+            "category": "AppServiceAuditLogs",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ],
+        "metrics": [
+          {
+            "timeGrain": "PT1M",
+            "category": "AllMetrics",
+            "enabled": true,
+            "retentionPolicy": {
+              "enabled": false,
+              "days": 0
+            }
+          }
+        ]
+      }
+    }
+  ]
 }
