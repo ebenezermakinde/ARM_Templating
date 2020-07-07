@@ -1,0 +1,200 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "domainName": {
+            "type": "String"
+        },
+        "localIPAddress": {
+            "type": "String"
+        },
+        "currentTime": {
+            "type": "String"
+        },
+        "Address1": {
+            "type": "String"
+        },
+        "Address2": {
+            "type": "String"
+        },
+        "City": {
+            "type": "String"
+        },
+        "Fax": {
+            "type": "String"
+        },
+        "JobTitle": {
+            "type": "string"
+        },
+        "Country": {
+            "type": "String"
+        },
+        "PostalCode": {
+            "type": "String"
+        },
+        "State": {
+            "type": "String"
+        },
+        "Email": {
+            "type": "String"
+        },
+        "NameFirst": {
+            "type": "String"
+        },
+        "NameLast": {
+            "type": "String"
+        },
+        "NameMiddle": {
+            "type": "String"
+        },
+        "Organization": {
+            "type": "String"
+        },
+        "Phone": {
+            "type": "String"
+        },
+        "autoRenew": {
+            "defaultValue": false,
+            "type": "Bool"
+        },
+        "targetDnsType": {
+            "defaultValue": "AzureDns",
+            "allowedValues": [
+                "AzureDns"
+            ],
+            "type": "String"
+        }
+    },
+    "variables": {
+        "dnsZoneResourceId": "[resourceId('Microsoft.Network/dnszones',parameters('domainName'))]",
+        "domainRegistrationResourceId": "[resourceId('Microsoft.DomainRegistration/domains',parameters('domainName'))]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.DomainRegistration/domains",
+            "apiVersion": "2015-02-01",
+            "name": "[parameters('domainName')]",
+            "location": "global",
+            "dependsOn": [
+                "[variables('dnsZoneResourceId')]"
+            ],
+            "properties": {
+                "Consent": {
+                    "AgreementKeys": [
+                        "DNRA",
+                        "DNPA"
+                    ],
+                    "AgreedBy": "[parameters('localIPAddress')]",
+                    "AgreedAt": "[parameters('currentTime')]"
+                },
+                "ContactAdmin": {
+                    "AddressMailing": {
+                        "Address1": "[parameters('Address1')]",
+                        "Address2": "[parameters('Address2')]",
+                        "City": "[parameters('City')]",
+                        "Country": "[parameters('Country')]",
+                        "PostalCode": "[parameters('PostalCode')]",
+                        "State": "[parameters('State')]"
+                    },
+                    "Email": "[parameters('Email')]",
+                    "NameFirst": "[parameters('NameFirst')]",
+                    "JobTitle":"[parameters('JobTitle')]",
+                    "Fax":"[parameters('Fax')]",
+                    "NameLast": "[parameters('NameLast')]",
+                    "NameMiddle": "[parameters('NameMiddle')]",
+                    "Organization": "[parameters('Organization')]",
+                    "Phone": "[parameters('Phone')]"
+                },
+                "ContactBilling": {
+                    "AddressMailing": {
+                        "Address1": "[parameters('Address1')]",
+                        "Address2": "[parameters('Address2')]",
+                        "City": "[parameters('City')]",
+                        "Country": "[parameters('Country')]",
+                        "PostalCode": "[parameters('PostalCode')]",
+                        "State": "[parameters('State')]"
+                    },
+                    "Email": "[parameters('Email')]",
+                    "NameFirst": "[parameters('NameFirst')]",
+                    "NameLast": "[parameters('NameLast')]",
+                    "JobTitle":"[parameters('JobTitle')]",
+                    "Fax":"[parameters('Fax')]",
+                    "NameMiddle": "[parameters('NameMiddle')]",
+                    "Organization": "[parameters('Organization')]",
+                    "Phone": "[parameters('Phone')]"
+                },
+                "ContactRegistrant": {
+                    "AddressMailing": {
+                        "Address1": "[parameters('Address1')]",
+                        "Address2": "[parameters('Address2')]",
+                        "City": "[parameters('City')]",
+                        "Country": "[parameters('Country')]",
+                        "PostalCode": "[parameters('PostalCode')]",
+                        "State": "[parameters('State')]"
+                    },
+                    "Email": "[parameters('Email')]",
+                    "NameFirst": "[parameters('NameFirst')]",
+                    "NameLast": "[parameters('NameLast')]",
+                    "JobTitle":"[parameters('JobTitle')]",
+                    "Fax":"[parameters('Fax')]",
+                    "NameMiddle": "[parameters('NameMiddle')]",
+                    "Organization": "[parameters('Organization')]",
+                    "Phone": "[parameters('Phone')]"
+                },
+                "ContactTech": {
+                    "AddressMailing": {
+                        "Address1": "[parameters('Address1')]",
+                        "Address2": "[parameters('Address2')]",
+                        "City": "[parameters('City')]",
+                        "Country": "[parameters('Country')]",
+                        "PostalCode": "[parameters('PostalCode')]",
+                        "State": "[parameters('State')]"
+                    },
+                    "Email": "[parameters('Email')]",
+                    "NameFirst": "[parameters('NameFirst')]",
+                    "NameLast": "[parameters('NameLast')]",
+                    "JobTitle":"[parameters('JobTitle')]",
+                    "Fax":"[parameters('Fax')]",
+                    "NameMiddle": "[parameters('NameMiddle')]",
+                    "Organization": "[parameters('Organization')]",
+                    "Phone": "[parameters('Phone')]"
+                },
+                "privacy": true,
+                "autoRenew": "[parameters('autoRenew')]",
+                "targetDnsType": "[parameters('targetDnsType')]",
+                "dnsZoneId": "[variables('dnsZoneResourceId')]"
+            }
+        },
+        {
+            "type": "Microsoft.DomainRegistration/domains/providers/locks",
+            "apiVersion": "2015-01-01",
+            "name": "[concat(parameters('domainName'),'/','Microsoft.Authorization/',parameters('domainName'))]",
+            "dependsOn": [
+                "[variables('domainRegistrationResourceId')]"
+            ],
+            "properties": {
+                "level": "CannotDelete",
+                "notes": "Deleting a domain will make it unavailable to purchase for 60 days. Please remove the lock before deleting this domain."
+            }
+        },
+        {
+            "type": "Microsoft.Network/dnszones",
+            "apiVersion": "2016-04-01",
+            "name": "[parameters('domainName')]",
+            "location": "global",
+            "properties": {}
+        },
+        {
+            "type": "Microsoft.Network/dnszones/providers/locks",
+            "apiVersion": "2015-01-01",
+            "name": "[concat(parameters('domainName'),'/','Microsoft.Authorization/',parameters('domainName'))]",
+            "dependsOn": [
+                "[variables('dnsZoneResourceId')]"
+            ],
+            "properties": {
+                "level": "CannotDelete",
+                "notes": "This DNS zone was created when purchasing a domain and is likely still required by the domain. If you still want to delete this DNS zone please remove the lock and delete the zone."
+            }
+        }
+    ]
+}
